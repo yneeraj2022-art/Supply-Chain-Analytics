@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<title>Supply Chain Analytics Dashboard</title>
+
+<style>
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        font-family: Arial, Helvetica, sans-serif;
+        background-color: #f4f6f8;
+        color: #333;
+    }
+
+    /* =========================
+       NAVIGATION BAR
+    ========================== */
+
+    .navbar {
+        background-color: #111827;
+        color: white;
+
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        padding: 18px 40px;
+
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .logo {
+        font-size: 22px;
+        font-weight: bold;
+    }
+
+    .nav-links {
+        display: flex;
+        gap: 25px;
+    }
+
+    .nav-links a {
+        color: white;
+        text-decoration: none;
+        font-size: 15px;
+        transition: 0.2s;
+    }
+
+    .nav-links a:hover {
+        color: #d1d5db;
+    }
+
+
+    /* =========================
+       HEADER
+    ========================== */
+
+    .header {
+        background-color: #1f2937;
+        color: white;
+
+        text-align: center;
+
+        padding: 40px 20px;
+    }
+
+    .header h1 {
+        font-size: 32px;
+        margin-bottom: 10px;
+    }
+
+    .header p {
+        font-size: 15px;
+        color: #d1d5db;
+    }
+
+
+    /* =========================
+       SECTION
+    ========================== */
+
+    .section-title {
+        max-width: 1200px;
+        margin: 45px auto 20px;
+
+        padding: 0 20px;
+
+        font-size: 24px;
+        color: #1f2937;
+    }
+
+
+    /* =========================
+       KPI CARDS
+    ========================== */
+
+    .cards {
+        display: grid;
+
+        grid-template-columns: repeat(3, 1fr);
+
+        gap: 20px;
+
+        max-width: 1200px;
+
+        margin: 30px auto;
+
+        padding: 0 20px;
+    }
+
+    .card {
+        background-color: white;
+
+        padding: 25px;
+
+        border-radius: 12px;
+
+        text-align: center;
+
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.10);
+
+        transition: 0.2s;
+    }
+
+    .card:hover {
+        transform: translateY(-4px);
+    }
+
+    .card h3 {
+        color: #555;
+
+        font-size: 17px;
+
+        margin-bottom: 12px;
+    }
+
+    .card p {
+        color: #111827;
+
+        font-size: 28px;
+
+        font-weight: bold;
+    }
+
+
+    /* =========================
+       CHART CONTAINER
+    ========================== */
+
+    .chart-container {
+        background-color: white;
+
+        max-width: 1000px;
+
+        margin: 30px auto;
+
+        padding: 25px;
+
+        border-radius: 12px;
+
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.10);
+    }
+
+    .chart-container h2 {
+        text-align: center;
+
+        margin-bottom: 20px;
+
+        color: #1f2937;
+    }
+
+    .chart-container img {
+        display: block;
+
+        width: 100%;
+
+        max-width: 900px;
+
+        height: auto;
+
+        margin: auto;
+    }
+
+
+    /* =========================
+       TABLE
+    ========================== */
+
+    .table-container {
+        background-color: white;
+
+        max-width: 1000px;
+
+        margin: 30px auto;
+
+        padding: 25px;
+
+        border-radius: 12px;
+
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.10);
+
+        overflow-x: auto;
+    }
+
+    .table-container h2 {
+        text-align: center;
+
+        margin-bottom: 20px;
+
+        color: #1f2937;
+    }
+
+    table {
+        width: 100%;
+
+        border-collapse: collapse;
+    }
+
+    th {
+        background-color: #f3f4f6;
+
+        color: #374151;
+
+        padding: 12px;
+
+        text-align: center;
+
+        border-bottom: 1px solid #ddd;
+    }
+
+    td {
+        padding: 12px;
+
+        text-align: center;
+
+        border-bottom: 1px solid #ddd;
+    }
+
+    tr:hover {
+        background-color: #f9fafb;
+    }
+
+
+    /* =========================
+       FOOTER
+    ========================== */
+
+    .footer {
+        background-color: #1f2937;
+
+        color: #d1d5db;
+
+        text-align: center;
+
+        padding: 20px;
+
+        margin-top: 50px;
+
+        font-size: 14px;
+    }
+
+    .footer p {
+        margin: 5px 0;
+    }
+
+
+    /* =========================
+       RESPONSIVE DESIGN
+    ========================== */
+
+    @media (max-width: 900px) {
+
+        .cards {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .navbar {
+            padding: 15px 20px;
+        }
+
+        .nav-links {
+            gap: 15px;
+        }
+    }
+
+
+    @media (max-width: 600px) {
+
+        .navbar {
+            flex-direction: column;
+
+            gap: 15px;
+
+            text-align: center;
+        }
+
+        .nav-links {
+            flex-wrap: wrap;
+
+            justify-content: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .cards {
+            grid-template-columns: 1fr;
+
+            padding: 0 15px;
+        }
+
+        .card p {
+            font-size: 24px;
+        }
+
+        .chart-container,
+        .table-container {
+            margin-left: 15px;
+
+            margin-right: 15px;
+
+            padding: 15px;
+        }
+    }
+
+</style>
+```
+
+</head>
+
+<body>
+
+```
+<!-- =========================
+     NAVIGATION BAR
+========================== -->
+
+<nav class="navbar">
+
+    <div class="logo">
+        Supply Chain Analytics
+    </div>
+
+    <div class="nav-links">
+
+        <a href="#dashboard">
+            Dashboard
+        </a>
+
+        <a href="#sales">
+            Sales
+        </a>
+
+        <a href="#supplier">
+            Supplier
+        </a>
+
+        <a href="#inventory">
+            Inventory
+        </a>
+
+    </div>
+
+</nav>
+
+
+<!-- =========================
+     HEADER
+========================== -->
+
+<div class="header" id="dashboard">
+
+    <h1>
+        Supply Chain Analytics Dashboard
+    </h1>
+
+    <p>
+        Data-driven analysis of sales, inventory and supplier performance
+    </p>
+
+</div>
+
+
+<!-- =========================
+     KPI SECTION
+========================== -->
+
+<h2 class="section-title">
+    Key Performance Indicators
+</h2>
+
+<div class="cards">
+
+    <div class="card">
+
+        <h3>
+            Total Sales
+        </h3>
+
+        <p>
+            ₹{{ "{:,.0f}".format(total_sales) }}
+        </p>
+
+    </div>
+
+
+    <div class="card">
+
+        <h3>
+            Total Orders
+        </h3>
+
+        <p>
+            {{ total_orders }}
+        </p>
+
+    </div>
+
+
+    <div class="card">
+
+        <h3>
+            Total Products
+        </h3>
+
+        <p>
+            {{ total_products }}
+        </p>
+
+    </div>
+
+
+    <div class="card">
+
+        <h3>
+            Total Suppliers
+        </h3>
+
+        <p>
+            {{ total_suppliers }}
+        </p>
+
+    </div>
+
+
+    <div class="card">
+
+        <h3>
+            Delayed Orders
+        </h3>
+
+        <p>
+            {{ delayed_orders }}
+        </p>
+
+    </div>
+
+
+    <div class="card">
+
+        <h3>
+            Avg Delivery Days
+        </h3>
+
+        <p>
+            {{ "{:.2f}".format(average_delivery_days) }}
+        </p>
+
+    </div>
+
+</div>
+
+
+<!-- =========================
+     SALES ANALYSIS
+========================== -->
+
+<h2 class="section-title" id="sales">
+    Sales Analysis
+</h2>
+
+
+<!-- Category Sales -->
+
+<div class="chart-container">
+
+    <h2>
+        Category-wise Sales
+    </h2>
+
+    <img
+        src="{{ url_for('static', filename='category_sales.png') }}"
+        alt="Category-wise Sales Chart"
+    >
+
+</div>
+
+
+<!-- Monthly Sales -->
+
+<div class="chart-container">
+
+    <h2>
+        Monthly Sales Trend
+    </h2>
+
+    <img
+        src="{{ url_for('static', filename='monthly_sales.png') }}"
+        alt="Monthly Sales Trend Chart"
+    >
+
+</div>
+
+
+<!-- =========================
+     SUPPLIER ANALYSIS
+========================== -->
+
+<h2 class="section-title" id="supplier">
+    Supplier Analysis
+</h2>
+
+
+<!-- Supplier On-Time -->
+
+<div class="chart-container">
+
+    <h2>
+        Supplier On-Time Delivery Rate
+    </h2>
+
+    <img
+        src="{{ url_for('static', filename='supplier_on_time_rate.png') }}"
+        alt="Supplier On-Time Delivery Rate Chart"
+    >
+
+</div>
+
+
+<!-- Delayed Orders Supplier -->
+
+<div class="chart-container">
+
+    <h2>
+        Delayed Orders by Supplier
+    </h2>
+
+    <img
+        src="{{ url_for('static', filename='delayed_orders_supplier.png') }}"
+        alt="Delayed Orders by Supplier Chart"
+    >
+
+</div>
+
+
+<!-- Delayed Orders Month -->
+
+<div class="chart-container">
+
+    <h2>
+        Delayed Orders by Month
+    </h2>
+
+    <img
+        src="{{ url_for('static', filename='delayed_orders_month.png') }}"
+        alt="Delayed Orders by Month Chart"
+    >
+
+</div>
+
+
+<!-- =========================
+     INVENTORY ANALYSIS
+========================== -->
+
+<h2 class="section-title" id="inventory">
+    Inventory Analysis
+</h2>
+
+
+<!-- Low Stock -->
+
+<div class="table-container">
+
+    <h2>
+        Low Stock Products
+    </h2>
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>
+                    Product Name
+                </th>
+
+                <th>
+                    Current Stock
+                </th>
+
+                <th>
+                    Reorder Level
+                </th>
+
+            </tr>
+
+        </thead>
+
+
+        <tbody>
+
+            {% for product in low_stock %}
+
+            <tr>
+
+                <td>
+                    {{ product["Product_Name"] }}
+                </td>
+
+                <td>
+                    {{ product["Stock"] }}
+                </td>
+
+                <td>
+                    {{ product["Reorder_Level"] }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+
+<!-- =========================
+     FOOTER
+========================== -->
+
+<div class="footer">
+
+    <p>
+        Supply Chain Analytics System
+    </p>
+
+    <p>
+        Built with Python | Pandas | SQL | Matplotlib | Flask
+    </p>
+
+</div>
+
+
+</body>
+
+</html>
