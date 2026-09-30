@@ -1,413 +1,305 @@
 from flask import Flask, render_template
-from sqlalchemy import create_engine, URL
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
-from dotenv import load_dotenv
 import os
 
 
+# ==========================================
+# Paths
+# ==========================================
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DATA_FILE = os.path.join(
+    BASE_DIR,
+    "data",
+    "supply_chain.csv"
+)
+
+STATIC_DIR = os.path.join(
+    BASE_DIR,
+    "static"
+)
 
 
-# ==========================================================
-# FLASK APPLICATION
-# ==========================================================
+# ==========================================
+# Flask App
+# ==========================================
 
 app = Flask(__name__)
 
 
-# ==========================================================
-# MYSQL DATABASE CONNECTION
-# ==========================================================
-
-password = "Neeraj@2007"
-
-connection_url = URL.create(
-    "mysql+mysqlconnector",
-    username="root",
-    password=password,
-    host="localhost",
-    port=3306,
-    database="supply_chain_db"
-)
-
-engine = create_engine(connection_url)
-
-
-# ==========================================================
-# STATIC FOLDER
-# ==========================================================
-
-static_folder = app.static_folder
-
-os.makedirs(static_folder, exist_ok=True)
-
-
-# ==========================================================
-# DASHBOARD ROUTE
-# ==========================================================
+# ==========================================
+# Dashboard Route
+# ==========================================
 
 @app.route("/")
-def dashboard():
+def home():
 
-    # ======================================================
-    # 1. KPI SUMMARY
-    # ======================================================
+    # --------------------------------------
+    # Load CSV Dataset
+    # --------------------------------------
 
-    summary_query = """
-    SELECT
-        SUM(Sales) AS Total_Sales,
+    df = pd.read_csv(DATA_FILE)
 
-        COUNT(*) AS Total_Orders,
-
-        COUNT(DISTINCT Product_ID) AS Total_Products,
-
-        COUNT(DISTINCT Supplier_ID) AS Total_Suppliers,
-
-        SUM(
-            CASE
-                WHEN Delivery_Status = 'Delayed'
-                THEN 1
-                ELSE 0
-            END
-        ) AS Delayed_Orders,
-
-        AVG(Delivery_Days) AS Average_Delivery_Days
-
-    FROM supply_chain;
-    """
-
-    summary = pd.read_sql(
-        summary_query,
-        engine
+    # Convert date column
+    df["Order_Date"] = pd.to_datetime(
+        df["Order_Date"],
+        errors="coerce"
     )
 
-    total_sales = summary["Total_Sales"].iloc[0]
+    # Convert numeric columns
+    df["Sales"] = pd.to_numeric(
+        df["Sales"],
+        errors="coerce"
+    )
 
-    total_orders = summary["Total_Orders"].iloc[0]
+    df["Delivery_Days"] = pd.to_numeric(
+        df["Delivery_Days"],
+        errors="coerce"
+    )
 
-    total_products = summary["Total_Products"].iloc[0]
+    df["Stock"] = pd.to_numeric(
+        df["Stock"],
+        errors="coerce"
+    )
 
-    total_suppliers = summary["Total_Suppliers"].iloc[0]
-
-    delayed_orders = summary["Delayed_Orders"].iloc[0]
-
-    average_delivery_days = summary[
-        "Average_Delivery_Days"
-    ].iloc[0]
-
-
-    # ======================================================
-    # 2. CATEGORY-WISE SALES
-    # ======================================================
-
-    category_query = """
-    SELECT
-        Category,
-        SUM(Sales) AS Total_Sales
-
-    FROM supply_chain
-
-    GROUP BY Category
-
-    ORDER BY Total_Sales DESC;
-    """
-
-    category_sales = pd.read_sql(
-        category_query,
-        engine
+    df["Reorder_Level"] = pd.to_numeric(
+        df["Reorder_Level"],
+        errors="coerce"
     )
 
 
-    plt.figure(figsize=(9, 5))
+    # ======================================
+    # KPI Summary
+    # ======================================
+
+    total_sales = df["Sales"].sum()
+
+    total_orders = len(df)
+
+    total_products = df["Product_ID"].nunique()
+
+    total_suppliers = df["Supplier_ID"].nunique()
+
+    delayed_orders = (
+        df["Delivery_Status"] == "Delayed"
+    ).sum()
+
+    average_delivery_days = (
+        df["Delivery_Days"].mean()
+    )
+
+
+    # ======================================
+    # Category-wise Sales
+    # ======================================
+
+    category_sales = (
+        df.groupby("Category")["Sales"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    plt.figure(figsize=(8, 5))
 
     plt.bar(
-        category_sales["Category"],
-        category_sales["Total_Sales"]
+        category_sales.index,
+        category_sales.values
     )
 
     plt.title("Category-wise Sales")
-
     plt.xlabel("Category")
-
     plt.ylabel("Total Sales")
-
-    plt.xticks(rotation=20)
+    plt.xticks(rotation=30)
 
     plt.tight_layout()
 
-
-    category_chart_path = os.path.join(
-        static_folder,
-        "category_sales.png"
-    )
-
     plt.savefig(
-        category_chart_path
+        os.path.join(
+            STATIC_DIR,
+            "category_sales.png"
+        )
     )
 
     plt.close()
 
 
-    # ======================================================
-    # 3. SUPPLIER ON-TIME DELIVERY RATE
-    # ======================================================
+    # ======================================
+    # Supplier On-Time Delivery Rate
+    # ======================================
 
-    supplier_query = """
-    SELECT
-        Supplier_Name,
-
-        COUNT(*) AS Total_Orders,
-
-        SUM(
-            CASE
-                WHEN Delivery_Status = 'On Time'
-                THEN 1
-                ELSE 0
-            END
-        ) AS On_Time_Orders,
-
-        ROUND(
-            SUM(
-                CASE
-                    WHEN Delivery_Status = 'On Time'
-                    THEN 1
-                    ELSE 0
-                END
-            ) * 100.0 / COUNT(*),
-            2
-        ) AS On_Time_Rate
-
-    FROM supply_chain
-
-    GROUP BY Supplier_Name
-
-    ORDER BY On_Time_Rate DESC;
-    """
-
-    supplier_performance = pd.read_sql(
-        supplier_query,
-        engine
+    supplier_performance = (
+        df.assign(
+            On_Time=df["Delivery_Status"]
+            .eq("On Time")
+            .astype(int)
+        )
+        .groupby("Supplier_Name")["On_Time"]
+        .mean()
+        .mul(100)
+        .sort_values(ascending=False)
     )
 
-
-    plt.figure(figsize=(9, 5))
+    plt.figure(figsize=(8, 5))
 
     plt.bar(
-        supplier_performance["Supplier_Name"],
-        supplier_performance["On_Time_Rate"]
+        supplier_performance.index,
+        supplier_performance.values
     )
 
-    plt.title(
-        "Supplier On-Time Delivery Rate"
-    )
-
+    plt.title("Supplier On-Time Delivery Rate")
     plt.xlabel("Supplier")
-
     plt.ylabel("On-Time Rate (%)")
-
-    plt.xticks(rotation=25)
-
-    plt.ylim(0, 100)
+    plt.xticks(rotation=30)
 
     plt.tight_layout()
 
-
-    supplier_chart_path = os.path.join(
-        static_folder,
-        "supplier_on_time_rate.png"
-    )
-
     plt.savefig(
-        supplier_chart_path
+        os.path.join(
+            STATIC_DIR,
+            "supplier_on_time_rate.png"
+        )
     )
 
     plt.close()
 
 
-    # ======================================================
-    # 4. LOW STOCK PRODUCTS
-    # ======================================================
+    # ======================================
+    # Low Stock Products
+    # ======================================
 
-    low_stock_query = """
-    SELECT
-        Product_Name,
-        Stock,
-        Reorder_Level
-
-    FROM supply_chain
-
-    WHERE Stock < Reorder_Level
-
-    ORDER BY Stock ASC
-
-    LIMIT 15;
-    """
-
-    low_stock = pd.read_sql(
-        low_stock_query,
-        engine
-    )
-
+    low_stock = df[
+        df["Stock"] < df["Reorder_Level"]
+    ][
+        [
+            "Product_Name",
+            "Stock",
+            "Reorder_Level"
+        ]
+    ].sort_values(
+        "Stock"
+    ).head(15)
 
     low_stock_records = low_stock.to_dict(
         orient="records"
     )
 
 
-    # ======================================================
-    # 5. MONTHLY SALES TREND
-    # ======================================================
+    # ======================================
+    # Monthly Sales Trend
+    # ======================================
 
-    monthly_sales_query = """
-    SELECT
-        MONTH(Order_Date) AS Month_Number,
+    monthly_sales = (
+        df.dropna(subset=["Order_Date"])
+        .assign(
+            Month_Number=lambda x:
+            x["Order_Date"].dt.month,
 
-        MONTHNAME(Order_Date) AS Month_Name,
-
-        SUM(Sales) AS Total_Sales
-
-    FROM supply_chain
-
-    GROUP BY
-        MONTH(Order_Date),
-        MONTHNAME(Order_Date)
-
-    ORDER BY
-        Month_Number;
-    """
-
-    monthly_sales = pd.read_sql(
-        monthly_sales_query,
-        engine
+            Month_Name=lambda x:
+            x["Order_Date"].dt.month_name()
+        )
+        .groupby(
+            ["Month_Number", "Month_Name"]
+        )["Sales"]
+        .sum()
+        .reset_index()
+        .sort_values("Month_Number")
     )
 
-
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(8, 5))
 
     plt.plot(
         monthly_sales["Month_Name"],
-        monthly_sales["Total_Sales"],
+        monthly_sales["Sales"],
         marker="o"
     )
 
-    plt.title(
-        "Monthly Sales Trend"
-    )
-
+    plt.title("Monthly Sales Trend")
     plt.xlabel("Month")
-
     plt.ylabel("Total Sales")
-
     plt.xticks(rotation=30)
 
-    plt.grid(
-        True,
-        alpha=0.3
-    )
-
     plt.tight_layout()
 
-
-    monthly_chart_path = os.path.join(
-        static_folder,
-        "monthly_sales.png"
-    )
-
     plt.savefig(
-        monthly_chart_path
+        os.path.join(
+            STATIC_DIR,
+            "monthly_sales.png"
+        )
     )
 
     plt.close()
 
 
-    # ======================================================
-    # 6. DELAYED ORDERS BY SUPPLIER
-    # ======================================================
+    # ======================================
+    # Delayed Orders by Supplier
+    # ======================================
 
-    delayed_supplier_query = """
-    SELECT
-        Supplier_Name,
-
-        COUNT(*) AS Delayed_Orders
-
-    FROM supply_chain
-
-    WHERE Delivery_Status = 'Delayed'
-
-    GROUP BY Supplier_Name
-
-    ORDER BY Delayed_Orders DESC;
-    """
-
-    delayed_supplier = pd.read_sql(
-        delayed_supplier_query,
-        engine
+    delayed_supplier = (
+        df[
+            df["Delivery_Status"] == "Delayed"
+        ]
+        .groupby("Supplier_Name")
+        .size()
+        .sort_values(ascending=False)
     )
 
-
-    plt.figure(figsize=(9, 5))
+    plt.figure(figsize=(8, 5))
 
     plt.bar(
-        delayed_supplier["Supplier_Name"],
-        delayed_supplier["Delayed_Orders"]
+        delayed_supplier.index,
+        delayed_supplier.values
     )
 
-    plt.title(
-        "Delayed Orders by Supplier"
-    )
-
+    plt.title("Delayed Orders by Supplier")
     plt.xlabel("Supplier")
-
-    plt.ylabel("Number of Delayed Orders")
-
-    plt.xticks(rotation=25)
+    plt.ylabel("Delayed Orders")
+    plt.xticks(rotation=30)
 
     plt.tight_layout()
 
-
-    delayed_supplier_chart_path = os.path.join(
-        static_folder,
-        "delayed_orders_supplier.png"
-    )
-
     plt.savefig(
-        delayed_supplier_chart_path
+        os.path.join(
+            STATIC_DIR,
+            "delayed_orders_supplier.png"
+        )
     )
 
     plt.close()
 
 
-    # ======================================================
-    # 7. DELAYED ORDERS BY MONTH
-    # ======================================================
+    # ======================================
+    # Delayed Orders by Month
+    # ======================================
 
-    delayed_month_query = """
-    SELECT
-        MONTH(Order_Date) AS Month_Number,
+    delayed_month = (
+        df[
+            df["Delivery_Status"] == "Delayed"
+        ]
+        .dropna(subset=["Order_Date"])
+        .assign(
+            Month_Number=lambda x:
+            x["Order_Date"].dt.month,
 
-        MONTHNAME(Order_Date) AS Month_Name,
-
-        COUNT(*) AS Delayed_Orders
-
-    FROM supply_chain
-
-    WHERE Delivery_Status = 'Delayed'
-
-    GROUP BY
-        MONTH(Order_Date),
-        MONTHNAME(Order_Date)
-
-    ORDER BY
-        Month_Number;
-    """
-
-    delayed_month = pd.read_sql(
-        delayed_month_query,
-        engine
+            Month_Name=lambda x:
+            x["Order_Date"].dt.month_name()
+        )
+        .groupby(
+            ["Month_Number", "Month_Name"]
+        )
+        .size()
+        .reset_index(
+            name="Delayed_Orders"
+        )
+        .sort_values("Month_Number")
     )
 
-
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(8, 5))
 
     plt.plot(
         delayed_month["Month_Name"],
@@ -415,42 +307,28 @@ def dashboard():
         marker="o"
     )
 
-    plt.title(
-        "Delayed Orders by Month"
-    )
-
+    plt.title("Delayed Orders by Month")
     plt.xlabel("Month")
-
     plt.ylabel("Delayed Orders")
-
     plt.xticks(rotation=30)
-
-    plt.grid(
-        True,
-        alpha=0.3
-    )
 
     plt.tight_layout()
 
-
-    delayed_month_chart_path = os.path.join(
-        static_folder,
-        "delayed_orders_month.png"
-    )
-
     plt.savefig(
-        delayed_month_chart_path
+        os.path.join(
+            STATIC_DIR,
+            "delayed_orders_month.png"
+        )
     )
 
     plt.close()
 
 
-    # ======================================================
-    # 8. SEND DATA TO HTML
-    # ======================================================
+    # ======================================
+    # Send Data to HTML
+    # ======================================
 
     return render_template(
-
         "index.html",
 
         total_sales=total_sales,
@@ -469,13 +347,18 @@ def dashboard():
     )
 
 
-# ==========================================================
-# RUN FLASK APPLICATION
-# ==========================================================
+# ==========================================
+# Run Flask Application
+# ==========================================
 
 if __name__ == "__main__":
 
-    app.run(
-        debug=True
+    port = int(
+        os.getenv("PORT", 5000)
     )
 
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
